@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+           
+<services module="pm_pm_rsrhmngtapp" package="phis.nu.his.pm.pm_rsrhmngtapp" pre-init="false">
+     
+    <service name="IntnMngt"
+             interface="${package}.intnmngt.IntnMngt"
+             class="${package}.intnmngt.IntnMngtImpl"
+             interceptor="system.proxy"
+             singleton="true"> 
+         <property name="IntnMngtMgt"  ref="pm_pm_rsrhmngtmgr.IntnMngtMgt"/>         
+    </service>
+</services>

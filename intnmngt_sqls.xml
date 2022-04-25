@@ -1,0 +1,1107 @@
+<?xml version="1.0" encoding="EUC-KR"?>
+<sqls>
+    <statement id="getPatientInfo"> <!-- 환자목록조회 -->
+
+SELECT  PAT_ID                              <!-- 환자코드 -->
+       ,PAT_NAME                            <!-- 환자성명 -->
+       ,PAT_SSN                             <!-- 환자주민등록번호 -->
+       ,SUBSTR(PAT_SSN,1,6) AS PAT_SSN_F    <!-- 환자주민번호앞자리 -->
+       ,SUBSTR(PAT_SSN,7,7) AS PAT_SSN_B    <!-- 환자주민번호뒷자리 -->
+       ,'' AS PAT_AGE                       <!-- 환자나이 -->
+       ,'' AS PAT_SEX                       <!-- 환자성별 -->
+       ,'' AS PAT_FOREIGN_YN                <!-- 환자외국인여부 -->
+       ,PAT_NOTE                            <!-- 환자특이사항 -->
+       
+    FROM PAM.PATIENT <!-- 환자테이블 -->
+    
+    WHERE 1=1
+
+    <isNotEmpty property="pat_id">   
+    AND PAT_ID = #pat_id#
+    </isNotEmpty>
+    <isNotEmpty property="pat_name"> 
+    AND PAT_NAME = #pat_name#
+    </isNotEmpty>
+    <isNotEmpty property="pat_ssn">  
+    AND PAT_SSN = #pat_ssn#
+    </isNotEmpty>
+    ORDER BY PAT_ID <!-- 환자코드순 -->
+
+    </statement>
+    
+    <statement id="insPatientInfo"> <!-- 환자추가 -->
+    
+INSERT INTO PAM.PATIENT(
+                                PAT_ID              
+                               ,PAT_NAME         
+                               ,PAT_SSN         
+                               ,PAT_FOREIGN_YN 
+                               ,PAT_NOTE     
+                       )
+                       
+                 VALUES(
+                                (SELECT NVL(MAX(PAT_ID),0)+1
+                                   FROM PAM.PATIENT)
+                               ,#pat_name#
+                               ,CONCAT(#pat_ssn_f#,#pat_ssn_b#)
+                               ,#pat_foreign_yn#
+                               ,#pat_note#
+                       )
+    
+    </statement>   
+    
+    <statement id="setPatientInfo"> <!-- 환자수정 -->
+    <![CDATA[
+UPDATE PAM.PATIENT
+
+ SET  PAT_NAME = #pat_name# 
+     ,PAT_SSN = #pat_ssn_f#||#pat_ssn_b#
+     ,PAT_FOREIGN_YN = #pat_foreign_yn#
+     ,PAT_NOTE =#pat_note#
+     
+ WHERE pat_id = #pat_id#
+    ]]>
+    </statement>   
+    
+    <statement id="delPatientInfo"> <!-- 환자삭제 -->
+    <![CDATA[
+DELETE FROM PAM.PATIENT
+
+ WHERE PAT_ID = #pat_id#
+    ]]>
+    </statement>
+    
+    <statement id="getReservInfo"> <!-- 예약조회 -->
+    
+SELECT   RS.PAT_ID AS PAT_ID                           <!-- 환자코드 -->
+        ,DR.DEPT_ID AS DP_ID                           <!-- 부서코드 -->
+        ,DP.DEPT_KO_NAME AS DP_NAME                    <!-- 부서성명 -->
+        ,RS.DR_ID AS DR_ID                             <!-- 의사코드 -->
+        ,DR.DR_NAME AS DR_NAME                         <!-- 의사성명 -->
+        ,RS.RESERV_DATE AS RS_DATE                     <!-- 예약일자 -->
+        ,RS.RESERV_TIME AS RS_TIME                     <!-- 예약시간 -->
+        ,SUBSTR(RS.RESERV_TIME,1,2) AS RS_TIME_HH      <!-- 예약시간시 -->
+        ,SUBSTR(RS.RESERV_TIME,3,2) AS RS_TIME_MM      <!-- 예약시간분 -->
+        ,RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME <!-- 예약일시 -->
+        ,RS.STATE_ID AS STATE_ID                       <!-- 진행상태 -->
+        ,COM_STATE.COMMON_NAME AS STATE_NAME           <!-- 진행상태 -->
+        ,RS.REQUEST_ID AS REQUEST_ID                   <!-- 진료의뢰서코드 -->
+        ,RS_INS.INS_ID AS INS_ID                       <!-- 예약환자보험정보코드 -->
+        ,RS_INS.COPAYDEC_ID AS CODEC_ID                <!-- 산정특례코드 -->
+        ,DR.DR_ID AS DR_ID_SUB                         <!-- 의사코드SUB -->
+        ,RS.RESERV_DATE AS RS_DATE_SUB                 <!-- 예약일자SUB -->
+        ,RS.RESERV_TIME AS RS_TIME_SUB                 <!-- 예약시간SUB -->
+        
+    FROM PAM.RESERVATION RS    <!-- 예약테이블 -->
+        ,PAM.DOCTORH DR        <!-- 의사테이블 -->
+        ,PAM.DEPT DP           <!-- 진료과테이블 -->
+        ,PAM.PATIENT PT        <!-- 환자테이블 -->
+        ,PAM.COMMON COM_STATE  <!-- 공통테이블(진행상태) -->
+        ,PAM.RESERV_INS RS_INS <!-- 예약환자보험정보테이블 -->
+        
+    WHERE 1=1
+    
+      AND RS.PAT_ID = #pat_id#
+      
+      AND RS.DR_ID = DR.DR_ID
+      AND DR.DEPT_ID = DP.DEPT_ID
+      AND RS.PAT_ID = PT.PAT_ID
+      AND COM_STATE.COMMON_ID = 'R'
+      AND RS.STATE_ID = COM_STATE.COMMON_CD
+      AND RS.PAT_ID = RS_INS.PAT_ID
+      AND RS.DR_ID = RS_INS.DR_ID
+      AND RS.RESERV_DATE = RS_INS.RESERV_DATE
+      AND RS.RESERV_TIME = RS_INS.RESERV_TIME
+    
+    ORDER BY RS.RESERV_DATE||RS.RESERV_TIME DESC <!--최근접수현황부터 내림차순-->
+
+    </statement>
+    
+    <statement id="getDrInfo"> <!-- 진료과별 의사콤보 -->
+ 
+SELECT DR_ID         <!-- 의사코드 -->
+      ,DR_NAME       <!-- 의사성명 -->
+      ,DR.DEPT_ID AS DP_ID    <!-- 진료과코드 -->
+      ,DEPT_KO_NAME AS DP_NAME  <!-- 진료과이름 -->
+      
+ FROM PAM.DOCTORH DR <!-- 의사테이블 -->
+     ,PAM.DEPT DP    <!-- 진료과테이블 -->
+     
+ WHERE DR.DEPT_ID = #dp_id#
+ 
+   AND DR.DEPT_ID = DP.DEPT_ID
+
+    </statement>
+
+    <statement id="getDeptInfo"> <!-- 진료의별 진료과콤보 -->
+ 
+SELECT DR_ID         <!-- 의사코드 -->
+      ,DR_NAME       <!-- 의사성명 -->
+      ,DR.DEPT_ID AS DP_ID    <!-- 진료과코드 -->
+      ,DEPT_KO_NAME AS DP_NAME  <!-- 진료과이름 -->
+      
+ FROM PAM.DOCTORH DR <!-- 의사테이블 -->
+     ,PAM.DEPT DP    <!-- 진료과테이블 -->
+     
+ WHERE DR.DR_ID = #dr_id#
+ 
+   AND DR.DEPT_ID = DP.DEPT_ID
+
+    </statement>
+
+    <statement id="insReservInfo"> <!-- 예약추가 -->
+    <![CDATA[
+INSERT INTO PAM.RESERVATION(
+                     PAT_ID
+                    ,DR_ID
+                    ,RESERV_DATE
+                    ,RESERV_TIME
+                    ,PAID_YN
+                    ,STATE_ID
+                    ,FIRST_ID
+                    ,REQUEST_ID
+                    )
+ VALUES(
+                     #pat_id#
+                    ,#dr_id#
+                    ,#rs_date#
+                    ,#rs_time_hh#||#rs_time_mm#
+                    ,'N'
+                    ,#state_id#
+                    ,(CASE WHEN (SELECT COUNT(*) 
+                                   FROM PAM.RESERVATION RS
+                                       ,PAM.DOCTORH DR 
+                                  WHERE RS.PAT_ID = #pat_id#
+                                    AND DR.DEPT_ID = #dp_id#
+                                    
+                                    AND DR.DR_ID = RS.DR_ID
+                                    ) != 0 THEN '1' ELSE '0' END)
+                    ,#request_id#
+       )
+       
+    ]]>
+    </statement>   
+
+    <statement id="insReservInsInfo"> <!-- 보험추가 -->
+    <![CDATA[    
+INSERT INTO PAM.RESERV_INS(
+                    RESERV_INS_ID
+                   ,PAT_ID
+                   ,DR_ID
+                   ,RESERV_DATE
+                   ,RESERV_TIME
+                   ,INS_ID
+                   ,COPAYDEC_ID
+                   )
+ VALUES(
+                    (SELECT NVL(MAX(RESERV_INS_ID),0)+1
+                       FROM PAM.RESERV_INS)
+                   ,#pat_id#
+                   ,#dr_id#
+                   ,#rs_date#
+                   ,#rs_time_hh#||#rs_time_mm#
+                   ,#ins_id#
+                   ,#codec_id#
+       )
+    ]]>
+    </statement>   
+
+    <statement id="insScriptInfo"> <!-- 외래기록추가 -->
+    <![CDATA[
+INSERT INTO PAM.EXAMINATION(
+                     EXAM_ID
+                    ,PAT_ID
+                    ,DR_ID
+                    ,RESERV_DATE
+                    ,RESERV_TIME    
+                    ,EXAM_CONTENT
+                    )
+ VALUES(
+                     (SELECT NVL(MAX(EXAM_ID),0)+1
+                        FROM PAM.EXAMINATION
+                     )
+                    ,#pat_id#
+                    ,#dr_id#
+                    ,#rs_date#
+                    ,#rs_time_hh#||#rs_time_mm#
+                    ,'write examination.'
+       )    
+    ]]>
+    </statement>      
+    
+    <statement id="insPaymentInfo"> <!-- 수납추가 -->
+    <![CDATA[
+INSERT INTO PAM.PAYMENTH(
+                  PAY_ID
+                 ,PAT_ID
+                 ,DR_ID
+                 ,RESERV_DATE
+                 ,RESERV_TIME
+                 ,PAY_MTHD_ID
+                 ,CASH_MTHD_ID
+                 ,CASH_RECEIPT_NUM
+                 ,MONTHLY
+                 ,CARD_PAID
+                 ,CASH_PAID
+                 )
+ VALUES(
+                 (SELECT NVL(MAX(PAY_ID),0)+1
+                               FROM PAM.PAYMENTH)
+                 ,#pat_id#
+                 ,#dr_id#
+                 ,#rs_date#
+                 ,#rs_time_hh#||#rs_time_mm#
+                 ,NULL
+                 ,NULL
+                 ,NULL
+                 ,NULL
+                 ,NULL
+                 ,NULL
+       )    
+    ]]>
+    </statement>      
+
+    <statement id="setReservInfo"> <!-- 예약수정 -->
+    <![CDATA[
+UPDATE PAM.RESERVATION
+ SET  DR_ID = #dr_id#
+     ,RESERV_DATE = #rs_date#
+     ,RESERV_TIME = #rs_time_hh#||#rs_time_mm#
+     ,STATE_ID = #state_id#
+     ,REQUEST_ID = #request_id#
+     
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+   
+    ]]>
+    </statement>   
+    
+    <statement id="setReservInsInfo"> <!-- 보험수정 -->
+    <![CDATA[
+UPDATE PAM.RESERV_INS
+ SET  DR_ID = #dr_id#
+     ,RESERV_DATE = #rs_date#
+     ,RESERV_TIME = #rs_time_hh#||#rs_time_mm#
+     ,INS_ID = #ins_id#
+     ,COPAYDEC_ID = #codec_id#
+     
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+
+   
+    ]]>
+    </statement>  
+       
+    <statement id="delReservInfo"> <!-- 예약삭제 -->
+    <![CDATA[
+DELETE FROM PAM.RESERVATION
+
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+   
+    ]]>
+    </statement>
+    
+    <statement id="delReservInsInfo"> <!-- 보험삭제 -->
+    <![CDATA[
+DELETE FROM PAM.RESERV_INS
+
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+   
+    ]]>
+    </statement>
+    
+    <statement id="delScriptInfo"> <!-- 외래삭제 -->
+    <![CDATA[
+DELETE FROM PAM.EXAMINATION
+
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+   
+    ]]>
+    </statement>
+    
+    <statement id="delPaymentInfo"> <!-- 수납삭제 -->
+    <![CDATA[
+DELETE FROM PAM.PAYMENTH
+
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id_sub#
+   AND RESERV_DATE = #rs_date_sub#
+   AND RESERV_TIME = #rs_time_sub#
+   
+    ]]>
+    </statement>
+
+<!-- 이상 외래등록화면 -->
+    
+<statement id="getNurseInfo"> <!-- 간호조회 -->
+    
+SELECT   RS.RESERV_DATE AS RS_DATE                       <!-- 예약일자 -->
+        ,RS.RESERV_TIME AS RS_TIME                       <!-- 예약시간 -->
+        ,RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME   <!-- 예약일시 -->
+        ,DR.DEPT_ID AS DP_ID                             <!-- 진료과코드 -->
+        ,DP.DEPT_KO_NAME AS DP_NAME                      <!-- 진료과이름 -->
+        ,RS.DR_ID AS DR_ID                               <!-- 의사코드 -->
+        ,DR.DR_NAME AS DR_NAME                           <!-- 의사이름 -->
+        ,RS.STATE_ID AS STATE_ID                         <!-- 진행상태코드 -->
+        ,COM1.COMMON_NAME AS STATE_NAME                  <!-- 진행상태 -->
+        ,RS.PAT_ID AS PAT_ID                             <!-- 환자코드 -->
+        ,PT.PAT_NAME AS PAT_NAME                         <!-- 환자성명 -->
+        ,NVL(TO_CHAR(TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','2','5','6') THEN 1900 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('3','4','7','8') THEN (CASE WHEN TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2))) >= 0 THEN  2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) ELSE NULL END) ELSE NULL END),'FM999'),'?') AS PAT_AGE
+                                                         <!-- 환자나이 -->
+        ,CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','3','5','7') THEN '남자' WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('2','4','6','8') THEN '여자' ELSE '?' END AS PAT_SEX
+                                                         <!-- 환자성별 -->
+        ,COM2.COMMON_CD AS FIRST_ID                      <!-- 초진여부코드 -->
+        ,COM2.COMMON_NAME AS FIRST                       <!-- 초진여부 -->
+        
+ FROM PAM.RESERVATION RS <!-- 예약테이블 -->
+     ,PAM.DOCTORH DR     <!-- 의사테이블 -->
+     ,PAM.DEPT DP        <!-- 진료과테이블 -->
+     ,PAM.COMMON COM1    <!-- 공통테이블(진행상태) -->
+     ,PAM.PATIENT PT     <!-- 환자테이블 -->
+     ,PAM.COMMON COM2    <!-- 공통테이블(초진여부) -->
+     
+ WHERE 1=1
+     
+    AND RS.STATE_ID IN ('0', '1')
+    <isNotEmpty property="rs_date">
+    AND RS.RESERV_DATE = #rs_date#
+    </isNotEmpty>
+    <isNotEmpty property="dp_name">
+    AND DP.DEPT_KO_NAME = #dp_name#
+    </isNotEmpty>
+    <isNotEmpty property="dr_name">
+    AND DR.DR_NAME = #dr_name#
+    </isNotEmpty>
+    <isNotEmpty property="pat_id">
+    AND RS.PAT_ID = #pat_id#
+    </isNotEmpty>
+    <isNotEmpty property="pat_name">
+    AND PT.PAT_NAME = #pat_name#
+    </isNotEmpty>
+    
+   AND RS.DR_ID = DR.DR_ID
+   AND DR.DEPT_ID = DP.DEPT_ID
+   AND COM1.COMMON_ID = 'R'
+   AND COM1.COMMON_CD = RS.STATE_ID
+   AND RS.PAT_ID = PT.PAT_ID
+   AND COM2.COMMON_ID = 'F'
+   AND COM2.COMMON_CD = RS.FIRST_ID
+   
+ ORDER BY RS.RESERV_DATE||RS.RESERV_TIME
+</statement>
+
+    <statement id="setNurseInfo"> <!-- 진행상태 예약완료, 대기로 수정 -->
+    <![CDATA[
+UPDATE PAM.RESERVATION
+ SET STATE_ID = #state_id#
+     
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time#
+    ]]>
+    </statement>   
+    
+<statement id="getExamInfo"> <!-- 외래기록조회 -->
+    
+SELECT   RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME <!-- 예약일시 -->
+        ,DR.DEPT_ID AS DP_ID                           <!-- 진료과코드 -->
+        ,DP.DEPT_KO_NAME AS DP_NAME                    <!-- 진료과이름 -->
+        ,DR.DR_ID AS DR_ID                             <!-- 의사코드 -->
+        ,DR.DR_NAME AS DR_NAME                         <!-- 의사성명 -->
+        ,RS.STATE_ID AS STATE_ID                       <!-- 진행상태코드 -->
+        ,COM1.COMMON_NAME AS STATE_NAME                <!-- 진행상태 -->
+        ,RS.PAT_ID AS PAT_ID                           <!-- 환자코드 -->
+        ,PT.PAT_NAME AS PAT_NAME                       <!-- 환자성명 -->
+        ,NVL(TO_CHAR(TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','2','5','6') THEN 1900 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('3','4','7','8') THEN (CASE WHEN TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2))) >= 0 THEN  2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) ELSE NULL END) ELSE NULL END),'FM999'),'?') AS PAT_AGE 
+                                                       <!-- 환자나이 -->
+        ,CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','3','5','7') THEN '남자' WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('2','4','6','8') THEN '여자' ELSE '?' END AS PAT_SEX
+                                                       <!-- 환자성별 -->
+        ,COM2.COMMON_NAME AS FIRST                     <!-- 초진여부 -->
+        
+ FROM PAM.RESERVATION RS <!-- 예약테이블 -->
+     ,PAM.DOCTORH DR     <!-- 의사테이블 -->
+     ,PAM.DEPT DP        <!-- 진료과테이블 -->
+     ,PAM.COMMON COM1    <!-- 공통테이블(진행상태) -->
+     ,PAM.PATIENT PT     <!-- 환자테이블 -->
+     ,PAM.COMMON COM2    <!-- 공통테이블(초진여부) -->
+     
+ WHERE 1=1
+    
+    AND RS.STATE_ID = '1'
+
+<isNotEmpty property="rs_date">
+    AND RS.RESERV_DATE = #rs_date#
+</isNotEmpty>
+<isNotEmpty property="dp_name">
+    AND DP.DEPT_KO_NAME = #dp_name#
+</isNotEmpty>
+<isNotEmpty property="dr_name">
+    AND DR.DR_NAME = #dr_name#
+</isNotEmpty>
+<isNotEmpty property="pat_id">
+    AND RS.PAT_ID = #pat_id#
+</isNotEmpty>
+<isNotEmpty property="pat_name">
+    AND PT.PAT_NAME = #pat_name#
+</isNotEmpty>
+ 
+   AND RS.DR_ID = DR.DR_ID
+   AND DR.DEPT_ID = DP.DEPT_ID
+   AND COM1.COMMON_ID = 'R'
+   AND COM1.COMMON_CD = RS.STATE_ID
+   AND RS.PAT_ID = PT.PAT_ID
+   AND COM2.COMMON_ID = 'F'
+   AND COM2.COMMON_CD = RS.FIRST_ID
+   
+ ORDER BY RS.RESERV_DATE||RS.RESERV_TIME 
+</statement>
+    
+<statement id="getExamPerpatInfo"> <!-- 환자별 진료조회 -->
+    
+SELECT   RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME <!-- 예약일시 -->
+        ,DP.DEPT_KO_NAME AS DP_NAME                    <!-- 진료과이름 -->
+        ,RS.DR_ID AS DR_ID                             <!-- 의사코드 -->
+        ,DR.DR_NAME AS DR_NAME                         <!-- 의사성명 -->
+        ,RS.PAT_ID AS PAT_ID                           <!-- 환자코드 -->
+        ,PT.PAT_NAME AS PAT_NAME                       <!-- 환자성명 -->
+        ,RS.STATE_ID AS STATE_ID                       <!-- 진행상태코드 -->
+        ,COM1.COMMON_NAME STATE_NAME                   <!-- 진행상태 -->
+        ,RS.RESERV_DATE AS RS_DATE                     <!-- 예약일자 -->
+        ,RS.RESERV_TIME AS RS_TIME                     <!-- 예약시간 -->
+        
+ FROM PAM.RESERVATION RS <!-- 예약테이블 -->
+     ,PAM.DOCTORH DR     <!-- 의사테이블 -->
+     ,PAM.DEPT DP        <!-- 진료과테이블 -->
+     ,PAM.PATIENT PT     <!-- 환자테이블 -->
+     ,PAM.COMMON COM1    <!-- 공통테이블(진행상태) -->
+     
+ WHERE 1=1
+ 
+   AND RS.PAT_ID = #pat_id#
+   AND RS.STATE_ID IN ('1', '2', '3')
+ 
+   AND RS.DR_ID = DR.DR_ID
+   AND DR.DEPT_ID = DP.DEPT_ID
+   AND RS.PAT_ID = PT.PAT_ID
+   AND COM1.COMMON_ID = 'R'
+   AND RS.STATE_ID = COM1.COMMON_CD
+   
+ ORDER BY RS.RESERV_DATE||RS.RESERV_TIME DESC
+</statement>
+
+<statement id="getSpecPerexamInfo"> <!-- 진료별 상세조회 -->
+
+SELECT  RS.RESERV_DATE AS RS_DATE                      <!-- 예약날짜 -->
+       ,RS.RESERV_TIME AS RS_TIME                      <!-- 예약시간 -->
+       ,RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME  <!-- 예약일시 -->
+       ,DR.DEPT_ID AS DP_ID                            <!-- 진료과코드 -->
+       ,DP.DEPT_KO_NAME AS DP_NAME                     <!-- 진료과이름 -->
+       ,RS.DR_ID AS DR_ID                              <!-- 의사코드 -->
+       ,DR.DR_NAME AS DR_NAME                          <!-- 의사이름 -->
+       ,RS.PAT_ID AS PAT_ID                            <!-- 환자코드 -->
+       ,PT.PAT_NAME AS PAT_NAME                        <!-- 환자이름 -->
+       ,NVL(TO_CHAR(TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','2','5','6') THEN 1900 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('3','4','7','8') THEN (CASE WHEN TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2))) >= 0 THEN  2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) ELSE NULL END) ELSE NULL END),'FM999'),'?') AS PAT_AGE
+                                                       <!-- 환자나이 -->
+       ,CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','3','5','7') THEN '남자' WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('2','4','6','8') THEN '여자' ELSE '?' END AS PAT_SEX
+                                                       <!-- 환자성별 -->
+       ,RS.STATE_ID AS STATE_ID                        <!-- 진행상태코드 -->
+       
+ FROM PAM.RESERVATION RS <!-- 예약테이블 -->
+     ,PAM.DOCTORH DR     <!-- 의사테이블 -->
+     ,PAM.DEPT DP        <!-- 진료과테이블 -->
+     ,PAM.PATIENT PT     <!-- 환자테이블 -->
+     
+  WHERE 1=1
+
+    AND RS.PAT_ID = #pat_id#
+    AND RS.RESERV_DATE = #rs_date#
+    AND RS.RESERV_TIME = #rs_time#
+    AND RS.DR_ID = #dr_id#
+   
+    AND RS.DR_ID = DR.DR_ID
+    AND DR.DEPT_ID = DP.DEPT_ID
+    AND RS.PAT_ID = PT.PAT_ID
+     
+</statement>
+
+<statement id="getDiagSearchInfo"> <!-- 진단조회 -->
+    
+SELECT DIAG.DIAG_ID AS DIAG_ID     <!-- 진단코드 -->
+      ,DIAG.DIAG_NAME AS DIAG_NAME <!-- 진단이름 -->
+      
+ FROM PAM.DIAGNOSIS DIAG <!-- 진단테이블 -->
+ 
+ WHERE 1=1
+    
+   <isNotEmpty property="diag_id">
+   AND DIAG_ID = #diag_id#
+   </isNotEmpty>
+   <isNotEmpty property="diag_name">
+   AND DIAG_NAME = #diag_name#
+   </isNotEmpty>
+ ORDER BY DIAG.DIAG_ID
+</statement>
+
+<statement id="getDiagInfo"> <!-- 환자별 진단조회 -->
+    
+SELECT DIAG.DIAG_ID AS DIAG_ID        <!-- 진단코드 -->
+      ,DIAG.DIAG_NAME AS DIAG_NAME    <!-- 진단이름 -->
+      ,RS_DIAG.PAT_ID AS PAT_ID       <!-- 환자코드 -->
+      ,RS_DIAG.DR_ID AS DR_ID         <!-- 의사코드 -->
+      ,RS_DIAG.RESERV_DATE AS RS_DATE <!-- 예약날짜 -->
+      ,RS_DIAG.RESERV_TIME AS RS_TIME <!-- 예약시간 -->
+      
+ FROM PAM.DIAGNOSIS DIAG       <!-- 진단테이블 -->
+     ,PAM.RESERV_DIAG RS_DIAG  <!-- 예약환자진단정보테이블 -->
+     ,PAM.RESERVATION RS       <!-- 예약테이블 -->
+     
+ WHERE 1=1
+    
+   AND rs_diag.PAT_ID = #pat_id#
+   AND rs_diag.DR_ID = #dr_id#
+   AND rs_diag.RESERV_DATE = #rs_date#
+   AND rs_diag.RESERV_TIME = #rs_time#
+    
+   AND DIAG.DIAG_ID = RS_DIAG.DIAG_ID
+   AND RS.PAT_ID = RS_DIAG.PAT_ID
+   AND RS.DR_ID = RS_DIAG.DR_ID
+   AND RS.RESERV_DATE = RS_DIAG.RESERV_DATE
+   AND RS.RESERV_TIME = RS_DIAG.RESERV_TIME
+
+</statement>
+
+<statement id="getPresSearchInfo"> <!-- 처방조회 -->
+    
+SELECT PRES.PRES_DIVISION AS PRES_DIVISION <!-- 처방구분 -->
+      ,PRES.PRES_NAME AS PRES_NAME         <!-- 처방이름 -->
+      ,PRES.PRES_DESC AS PRES_DESC         <!-- 처방상세 -->
+      ,PRES.PRES_ID AS PRES_ID             <!-- 처방코드 -->
+      ,PRES.PAY_UNPAID AS PAY_UNPAID       <!-- 급여비급여코드 -->
+      ,PUP.COMMON_NAME AS PUP_NAME         <!-- 급여비급여 -->
+      
+ FROM PAM.PRESCRIPTIONH PRES <!-- 예약환자처방정보테이블 -->
+     ,PAM.COMMON PUP         <!-- 공통테이블(급여비급여) -->
+ 
+ WHERE 1=1
+     
+   <isNotEmpty property="pres_division">
+   AND PRES.PRES_DIVISION = #pres_division#
+   </isNotEmpty>
+   <isNotEmpty property="pres_id">
+   AND PRES.PRES_ID = #pres_id#
+   </isNotEmpty>
+   <isNotEmpty property="pres_name">
+   AND PRES.PRES_NAME = #pres_name#
+   </isNotEmpty>
+   
+   AND PUP.COMMON_ID = 'U'
+   AND PRES.PAY_UNPAID = PUP.COMMON_CD
+   
+ ORDER BY PRES.PRES_ID
+
+</statement>
+
+<statement id="getPresInfo"> <!-- 환자별 처방조회 -->
+   
+SELECT PRES.PRES_DIVISION AS PRES_DIVISION <!-- 처방구분 -->
+      ,PRES.PRES_NAME AS PRES_NAME         <!-- 처방이름 -->
+      ,PRES.PRES_DESC AS PRES_DESC         <!-- 처방상세 -->
+      ,PRES.PRES_ID AS PRES_ID             <!-- 처방코드 -->
+      ,PRES.PAY_UNPAID AS PAY_UNPAID       <!-- 급여비급여코드 -->
+      ,PUP.COMMON_NAME AS PUP_NAME         <!-- 급여비급여 -->
+      ,RS_PRES.PAT_ID AS PAT_ID            <!-- 환자코드 -->
+
+ FROM  PAM.RESERV_PRES RS_PRES <!-- 예약환자처방정보테이블 -->
+      ,PAM.PRESCRIPTIONH PRES  <!-- 처방테이블 -->
+      ,PAM.RESERVATION RS      <!-- 예약테이블 -->
+      ,PAM.COMMON PUP          <!-- 공통테이블(급여비급여) -->
+      
+ WHERE 1=1 
+   
+   AND rs_pres.PAT_ID = #pat_id#
+   AND rs_pres.DR_ID = #dr_id#
+   AND rs_pres.RESERV_DATE = #rs_date#
+   AND rs_pres.RESERV_TIME = #rs_time# 
+
+
+   AND RS_PRES.PRES_ID = PRES.PRES_ID
+   AND RS_PRES.PAT_ID = RS.PAT_ID
+   AND RS_PRES.DR_ID = RS.DR_ID
+   AND RS_PRES.RESERV_DATE = RS.RESERV_DATE
+   AND RS_PRES.RESERV_TIME = RS.RESERV_TIME
+   AND PUP.COMMON_ID = 'U'
+   AND PRES.PAY_UNPAID = PUP.COMMON_CD
+
+</statement>
+
+<statement id="getScriptInfo"> <!-- 외래기록조회 -->
+    
+SELECT EX.EXAM_ID       <!-- 외래기록코드 -->
+      ,EX.EXAM_CONTENT  <!-- 외래기록내용 -->
+
+ FROM  PAM.EXAMINATION EX <!-- 외래기록테이블 -->
+      ,PAM.RESERVATION RS <!-- 예약테이블 -->
+
+ WHERE 1=1
+ 
+   AND ex.PAT_ID = #pat_id#
+   AND ex.DR_ID = #dr_id#
+   AND ex.RESERV_DATE = #rs_date#
+   AND ex.RESERV_TIME = #rs_time# 
+   
+   AND EX.PAT_ID = RS.PAT_ID
+   AND EX.DR_ID = RS.DR_ID
+   AND EX.RESERV_DATE = RS.RESERV_DATE
+   AND EX.RESERV_TIME = RS.RESERV_TIME
+</statement>
+
+<statement id="insDiagInfo"> <!-- 진단추가 -->
+ <![CDATA[
+ INSERT INTO PAM.RESERV_DIAG(
+                     RESERV_DIAG_ID
+                    ,PAT_ID
+                    ,DR_ID
+                    ,RESERV_DATE
+                    ,RESERV_TIME
+                    ,DIAG_ID
+                    )
+ VALUES(
+                     (SELECT NVL(MAX(RESERV_DIAG_ID),0)+1
+                                   FROM PAM.RESERV_DIAG)
+                    ,#pat_id#
+                    ,#dr_id#
+                    ,#rs_date#
+                    ,#rs_time# 
+                    ,#diag_id#
+       )
+    
+ ]]>
+</statement>
+
+<statement id="insPresInfo"> <!-- 처방추가 -->
+<![CDATA[
+INSERT INTO PAM.RESERV_PRES(
+                     RESERV_PRES_ID
+                    ,PAT_ID
+                    ,DR_ID
+                    ,RESERV_DATE
+                    ,RESERV_TIME
+                    ,PRES_ID
+                    )
+ VALUES(
+                     (SELECT NVL(MAX(RESERV_PRES_ID),0)+1
+                                   FROM PAM.RESERV_PRES)
+                    ,#pat_id#
+                    ,#dr_id#
+                    ,#rs_date#
+                    ,#rs_time# 
+                    ,#pres_id#
+       )
+       
+ ]]>
+</statement>
+
+
+<statement id="setScriptInfo"> <!-- 외래기록수정 -->
+    <![CDATA[
+UPDATE PAM.EXAMINATION
+ SET EXAM_CONTENT = #exam_content#
+     
+ WHERE 1=1
+   ]]>
+   AND PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+
+</statement>
+
+<statement id="delDiagInfo"> <!-- 진단삭제 -->
+    <![CDATA[
+DELETE FROM PAM.RESERV_DIAG
+    ]]>
+ WHERE diag_id = #diag_id#
+   AND PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+    
+</statement>
+
+<statement id="delPresInfo"> <!-- 처방삭제 -->
+    <![CDATA[
+DELETE FROM PAM.RESERV_PRES
+    ]]>
+ WHERE pres_id = #pres_id#
+   AND PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+</statement>
+
+<statement id="setPresComInfo"> <!-- 진행상태 처방완료로 수정 -->
+    <![CDATA[
+UPDATE PAM.RESERVATION
+ SET STATE_ID = '2'
+ WHERE 1=1
+   ]]>
+   AND PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+
+</statement>
+
+<statement id="getPaymentInfo"> <!-- 수납조회 -->
+    
+SELECT  DR.DEPT_ID AS DP_ID                          <!-- 진료과코드 -->
+       ,DP.DEPT_KO_NAME AS DP_NAME                   <!-- 진료과코드 -->
+       ,RS.DR_ID AS DR_ID                            <!-- 진료의코드 -->
+       ,DR.DR_NAME AS DR_NAME                        <!-- 진료의 -->
+       ,RS.PAT_ID AS PAT_ID                          <!-- 환자코드 -->
+       ,PT.PAT_NAME AS PAT_NAME                      <!-- 환자성명 -->
+       ,NVL(TO_CHAR(TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','2','5','6') THEN 1900 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('3','4','7','8') THEN (CASE WHEN TO_NUMBER(TO_CHAR(SYSDATE,'YYYY')) - (2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2))) >= 0 THEN  2000 + TO_NUMBER(SUBSTR(PT.PAT_SSN,1,2)) ELSE NULL END) ELSE NULL END),'FM999'),'?') AS PAT_AGE
+                                                     <!-- 환자나이 -->
+       ,CASE WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('1','3','5','7') THEN '남자' WHEN SUBSTR(PT.PAT_SSN,7,1) IN ('2','4','6','8') THEN '여자' ELSE '?' END AS PAT_SEX
+                                                     <!-- 성별 -->
+       ,RS.RESERV_DATE AS RS_DATE                    <!-- 예약일자 -->
+       ,RS.RESERV_TIME AS RS_TIME                    <!-- 예약시간 -->
+       ,RS.RESERV_DATE||RS.RESERV_TIME AS RS_DATETIME<!-- 예약일시 -->
+       ,RS.STATE_ID AS STATE_ID                      <!-- 진행상태코드 -->
+       ,COM1.COMMON_NAME AS STATE_NAME               <!-- 진행상태 -->
+       ,RS.FIRST_ID AS FIRST_ID                      <!-- 초재진구분코드 -->
+       ,COM3.COMMON_NAME AS FIRST_NAME               <!-- 초재진구분명 -->
+       ,RS.REQUEST_ID AS REQUEST_ID                  <!-- 진료의뢰서코드 -->
+       ,COM2.COMMON_NAME AS REQUEST_NAME             <!-- 진료의뢰서여부 -->
+       ,RS.PAID_YN AS PAID_YN                        <!-- 수납여부 -->
+       ,RS_INS.INS_ID AS INS_ID                      <!-- 보험코드 -->
+       ,INS.INS_NAME AS INS_NAME                     <!-- 보험명 -->
+       ,RS_INS.COPAYDEC_ID AS CODEC_ID               <!-- 산정특례코드 -->
+       ,COPAY_DEC.COPAYDEC_NAME AS CODEC_NAME        <!-- 산정특례제도명 -->
+       ,CAL.PAY + CAL.UNPAID + CAL.BASICFEE AS TOTAL <!-- 총진료비 -->
+       ,CAL.PAY AS PAY_TOTAL                         <!-- 급여총액 -->
+       ,ROUND(COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS PAYME
+                                                     <!-- 급여본인={산정특례*건강보험*(진료의뢰서감가*급여총액)} -->
+       ,ROUND(CAL.PAY - COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS PAYINS
+                                                     <!-- 급여보험자=(급여총액-급여본인) -->
+       ,CAL.UNPAID AS UNPAID_TOTAL                   <!-- 비급여총액 -->
+       ,ROUND(CAL.UNPAID + CAL.BASICFEE + COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS FINALTOTAL 
+                                                     <!-- 납부할금액=(총진료비-급여보험자) -->
+       ,PY.PAY_MTHD_ID AS PAY_MTHD_ID                <!-- 수납방법 -->
+       ,PY.CASH_MTHD_ID AS CASH_MTHD_ID              <!-- 현금영수증 방법 -->
+       ,PY.CASH_RECEIPT_NUM AS CASH_RECEIPT_NUM      <!-- 현금영수증번호 -->
+       ,PY.MONTHLY AS MONTHLY                        <!-- 할부 -->
+       ,PY.CARD_PAID AS CARD_PAID                    <!-- 카드결제액 -->
+       ,PY.CASH_PAID AS CASH_PAID                    <!-- 현금금액 -->
+       ,'' AS PAID                                   <!-- 납입금 -->
+       
+ FROM PAM.RESERVATION RS                 <!--예약테이블-->
+     ,PAM.DOCTORH DR                     <!--진료의테이블-->
+     ,PAM.COMMON COM1                    <!--공통테이블(진행상태)-->
+     ,PAM.COMMON COM2                    <!-- 공통테이블(진료의뢰서) -->
+     ,PAM.COMMON COM3                    <!-- 공통테이블(초재진여부) -->
+     ,PAM.RESERV_INS RS_INS              <!-- 환자보험테이블 -->
+     ,PAM.PAYMENTH PY                    <!-- 수납테이블 -->
+     ,PAM.INSURANCEH INS                 <!-- 보험테이블 -->
+     ,PAM.COPAYMENT_DECREASING COPAY_DEC <!-- 산정특례테이블 -->
+     ,PAM.DEPT DP                        <!-- 진료과테이블 -->
+     ,PAM.PATIENT PT                     <!-- 환자테이블 -->
+     <!-- ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓CAL테이블 시작↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ -->     
+     ,(SELECT RS_PRES.PAT_ID AS PAT_ID                  <!--환자코드 -->
+               ,RS_PRES.DR_ID AS DR_ID                  <!--의료진코드 -->
+               ,RS_PRES.RESERV_DATE AS RS_DATE          <!--예약일자-->
+               ,RS_PRES.RESERV_TIME AS RS_TIME          <!--예약시간-->
+               ,SUM(PAY.PRES_PRICE) AS PAY              <!--급여-->
+               ,SUM(UNPAID.PRES_PRICE) AS UNPAID        <!--비급여-->
+               ,MAX(COM_FIRST.COMMON_VALUE) AS BASICFEE <!--진찰료-->
+                                            
+         FROM  PAM.RESERV_PRES RS_PRES <!-- 환자보험정보테이블 -->
+              ,PAM.COMMON COM_FIRST    <!-- 공통테이블(초재진여부) -->
+              ,PAM.RESERVATION RS      <!-- 예약정보테이블-->
+              ,(SELECT P1.PRES_ID      <!-- 급여처방가격테이블-->
+                      ,P1.PRES_NAME
+                      ,P1.PRES_DIVISION
+                      ,P1.PRES_DESC
+                      ,NVL(P2.PRES_PRICE,0) AS PRES_PRICE
+                      ,P1.PAY_UNPAID
+                  FROM PAM.PRESCRIPTIONH P1
+                  LEFT JOIN (SELECT PRES_ID
+                                   ,PRES_PRICE
+                               FROM PAM.PRESCRIPTIONH
+                              WHERE PAY_UNPAID = 0) P2
+                  ON P1.PRES_ID = P2.PRES_ID
+               ) PAY    
+                  
+              ,(SELECT P1.PRES_ID      <!--비급여처방가격테이블-->
+                      ,P1.PRES_NAME
+                      ,P1.PRES_DIVISION
+                      ,P1.PRES_DESC
+                      ,NVL(P2.PRES_PRICE,0) AS PRES_PRICE
+                      ,P1.PAY_UNPAID
+                  FROM PAM.PRESCRIPTIONH P1
+                  LEFT JOIN (SELECT PRES_ID
+                                   ,PRES_PRICE
+                               FROM PAM.PRESCRIPTIONH
+                              WHERE PAY_UNPAID = 1) P2
+                  ON P1.PRES_ID = P2.PRES_ID
+               ) UNPAID 
+                 
+         WHERE 1=1
+         
+           AND RS_PRES.PAT_ID = RS.PAT_ID
+           AND RS_PRES.DR_ID = RS.DR_ID
+           AND RS_PRES.RESERV_DATE = RS.RESERV_DATE
+           AND RS_PRES.RESERV_TIME = RS.RESERV_TIME
+           AND COM_FIRST.COMMON_ID = 'F'
+           AND COM_FIRST.COMMON_CD = RS.FIRST_ID
+           AND RS_PRES.PRES_ID = PAY.PRES_ID
+           AND RS_PRES.PRES_ID = UNPAID.PRES_ID
+                 
+         GROUP BY RS_PRES.PAT_ID
+                 ,RS_PRES.DR_ID
+                 ,RS_PRES.RESERV_DATE
+                 ,RS_PRES.RESERV_TIME
+       ) CAL <!--급여별 비급여별 합계와 진찰료 테이블 -->
+<!--      ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑CAL테이블 끝↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ -->
+     
+  WHERE 1=1
+
+    <isNotEmpty property="pat_id">
+    AND RS.PAT_ID = #pat_id#
+    </isNotEmpty>
+    <isNotEmpty property="pat_name">
+    AND PT.PAT_NAME = #pat_name#
+    </isNotEmpty>
+    <isNotEmpty property="rs_date">
+    AND RS.RESERV_DATE = #rs_date#
+    </isNotEmpty>
+    <isNotEmpty property="rs_time">
+    AND RS.RESERV_TIME = #rs_time#
+    </isNotEmpty>
+    <isNotEmpty property="paid_yn">
+    AND RS.PAID_YN = #paid_yn#
+    </isNotEmpty>
+    
+    AND RS.STATE_ID IN ('2','3')
+    
+    AND RS.DR_ID = DR.DR_ID
+    AND RS.PAT_ID = RS_INS.PAT_ID
+    AND RS.DR_ID = RS_INS.DR_ID
+    AND RS.RESERV_DATE = RS_INS.RESERV_DATE
+    AND RS.RESERV_TIME = RS_INS.RESERV_TIME
+    AND COM1.COMMON_ID = 'R'
+    AND RS.STATE_ID = COM1.COMMON_CD
+    AND COM2.COMMON_ID = 'P'
+    AND RS.REQUEST_ID = COM2.COMMON_CD
+    AND COM3.COMMON_ID = 'F'
+    AND RS.FIRST_ID = COM3.COMMON_CD
+    AND RS.PAT_ID = PY.PAT_ID
+    AND RS.DR_ID = PY.DR_ID
+    AND RS.RESERV_DATE = PY.RESERV_DATE
+    AND RS.RESERV_TIME = PY.RESERV_TIME
+    AND RS_INS.INS_ID = INS.INS_ID
+    AND RS_INS.COPAYDEC_ID = COPAY_DEC.COPAYDEC_ID
+    AND RS.PAT_ID = CAL.PAT_ID
+    AND RS.DR_ID = CAL.DR_ID
+    AND RS.RESERV_DATE = CAL.RS_DATE
+    AND RS.RESERV_TIME = CAL.RS_TIME
+    AND DR.DEPT_ID = DP.DEPT_ID
+    AND RS.PAT_ID = PT.PAT_ID
+    
+    ORDER BY PAT_ID
+            ,DR_ID
+            ,RS_DATE
+            ,RS_TIME
+</statement>
+
+<statement id="setPaymentInfo"> <!-- 수납수정 -->
+    <![CDATA[
+UPDATE PAM.PAYMENTH
+ SET  PAY_MTHD_ID = #pay_mthd_id#
+     ,CASH_MTHD_ID = #cash_mthd_id#
+     ,CASH_RECEIPT_NUM = #cash_receipt_num#
+     ,MONTHLY = #monthly#
+     ,CARD_PAID = #card_paid#
+     ,CASH_PAID = #cash_paid#
+    ]]>
+
+ WHERE PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+</statement>
+
+<statement id="setPaymentComInfo"> <!-- 진행상태 수납완료로 수정 -->
+    <![CDATA[
+UPDATE PAM.RESERVATION
+ SET STATE_ID = '3'
+    ,PAID_YN = 'Y'
+ WHERE 1=1
+   ]]>
+   AND PAT_ID = #pat_id#
+   AND DR_ID = #dr_id#
+   AND RESERV_DATE = #rs_date#
+   AND RESERV_TIME = #rs_time# 
+
+</statement>
+
+<statement id="getReceiptInfo"> <!-- 영수증 조회 -->
+    
+SELECT  RS.PAT_ID                                    <!-- 환자코드 -->
+       ,PT.PAT_NAME                                  <!-- 환자성명 -->
+       ,DP.DEPT_KO_NAME AS DP_NAME                   <!-- 진료과코드 -->
+       ,RS.DR_ID AS DR_ID                            <!-- 진료의 -->
+       ,DR.DR_NAME AS DR_NAME                        <!-- 진료의성명 -->
+       ,RS.RESERV_DATE AS RS_DATE                    <!-- 예약일자 -->
+       ,RS.RESERV_TIME AS RS_TIME                    <!--예약시간-->
+       ,COM1.COMMON_NAME AS STATE_NAME               <!--진행상태코드-->
+       ,COM3.COMMON_NAME AS FIRST_NAME               <!--초재진구분코드-->
+       ,COM2.COMMON_NAME AS REQUEST_NAME             <!--진료의뢰서코드-->
+       ,COM4.COMMON_NAME AS PAY_MTHD_NAME            <!--결제방법 -->
+       ,COM5.COMMON_NAME AS CASH_MTHD_NAME           <!--현금영수증방법  -->
+       ,INS.INS_NAME AS INS_NAME                     <!--보험유형-->
+       ,COPAY_DEC.COPAYDEC_NAME AS CODEC_NAME        <!--산정특례-->
+       ,CAL.PAY + CAL.UNPAID + CAL.BASICFEE AS TOTAL <!--총진료비-->
+       ,CAL.PAY AS PAY_TOTAL                         <!--급여총액-->
+       ,ROUND(COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS PAYME
+                                                     <!--급여본인={산정특례*건강보험*(진료의뢰서감가*급여총액)}-->
+       ,ROUND(CAL.PAY - COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS PAYINS 
+                                                     <!--급여보험자=(급여총액-급여본인)-->
+       ,CAL.UNPAID AS UNPAID_TOTAL                   <!--비급여총액-->
+       ,ROUND(CAL.UNPAID + CAL.BASICFEE + COPAY_DEC.COPAYDEC_DC*INS.INS_DC*(COM2.COMMON_VALUE*CAL.PAY)) AS FINALTOTAL  
+                                                     <!--납부할금액=(총진료비-급여보험자)-->
+       ,PY.PAY_MTHD_ID AS PAY_MTHD_ID                <!--수납방법코드-->
+       ,PY.CASH_MTHD_ID AS CASH_MTHD_ID              <!--현금영수증 방법코드-->
+       ,PY.CASH_RECEIPT_NUM AS CASH_RECEIPT_NUM      <!--현금영수증번호-->
+       ,PY.MONTHLY AS MONTHLY                        <!--할부-->
+       ,PY.CARD_PAID AS CARD_PAID                    <!--카드결제액-->
+       ,PY.CASH_PAID AS CASH_PAID                    <!--현금금액-->
+       ,PY.CARD_PAID + PY.CASH_PAID AS PAID          <!--납입금-->
+       
+ FROM PAM.RESERVATION RS                 <!--예약테이블-->
+     ,PAM.DOCTORH DR                     <!--진료의테이블-->
+     ,PAM.COMMON COM1                    <!--공통테이블(진행상태)-->
+     ,PAM.COMMON COM2                    <!--공통테이블(진료의뢰서)-->
+     ,PAM.COMMON COM3                    <!--공통테이블(초재진여부)-->
+     ,PAM.COMMON COM4                    <!--공통테이블(수납방법)-->
+     ,PAM.COMMON COM5                    <!--공통테이블(현금영수증방법)-->
+     ,PAM.RESERV_INS RS_INS              <!--환자보험테이블-->
+     ,PAM.PAYMENTH PY                    <!--수납테이블-->
+     ,PAM.INSURANCEH INS                 <!--보험테이블-->
+     ,PAM.COPAYMENT_DECREASING COPAY_DEC <!--산정특례테이블-->
+     ,PAM.PATIENT PT                     <!--환자테이블-->
+     ,PAM.DEPT DP                        <!--부서테이블-->
+     <!-- ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓CAL테이블 시작↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ -->  
+     ,(SELECT RS_PRES.PAT_ID AS PAT_ID                  <!--환자코드-->
+               ,RS_PRES.DR_ID AS DR_ID                  <!-- 의료진코드 -->
+               ,RS_PRES.RESERV_DATE AS RS_DATE          <!-- 예약일자 -->
+               ,RS_PRES.RESERV_TIME AS RS_TIME          <!-- 예약시간 -->
+               ,SUM(PAY.PRES_PRICE) AS PAY              <!-- 급여 -->
+               ,SUM(UNPAID.PRES_PRICE) AS UNPAID        <!-- 비급여 -->
+               ,MAX(COM_FIRST.COMMON_VALUE) AS BASICFEE <!-- 진찰료 -->
+                                            
+         FROM  PAM.RESERV_PRES RS_PRES <!-- 환자보험정보테이블 -->
+              ,PAM.COMMON COM_FIRST    <!-- 공통테이블(초재진여부) -->
+              ,PAM.RESERVATION RS      <!-- 예약정보테이블 -->
+              ,(SELECT P1.PRES_ID      <!-- 급여처방가격테이블 -->
+                      ,P1.PRES_NAME
+                      ,P1.PRES_DIVISION
+                      ,P1.PRES_DESC
+                      ,NVL(P2.PRES_PRICE,0) AS PRES_PRICE
+                      ,P1.PAY_UNPAID
+                  FROM PAM.PRESCRIPTIONH P1
+                  LEFT JOIN (SELECT PRES_ID
+                                   ,PRES_PRICE
+                               FROM PAM.PRESCRIPTIONH
+                              WHERE PAY_UNPAID = 0) P2
+                  ON P1.PRES_ID = P2.PRES_ID
+               ) PAY    
+                  
+              ,(SELECT P1.PRES_ID      <!-- 비급여처방가격테이블 -->
+                      ,P1.PRES_NAME
+                      ,P1.PRES_DIVISION
+                      ,P1.PRES_DESC
+                      ,NVL(P2.PRES_PRICE,0) AS PRES_PRICE
+                      ,P1.PAY_UNPAID
+                  FROM PAM.PRESCRIPTIONH P1
+                  LEFT JOIN (SELECT PRES_ID
+                                   ,PRES_PRICE
+                               FROM PAM.PRESCRIPTIONH
+                              WHERE PAY_UNPAID = 1) P2
+                  ON P1.PRES_ID = P2.PRES_ID
+               ) UNPAID 
+                 
+         WHERE 1=1
+         
+           AND RS_PRES.PAT_ID = RS.PAT_ID
+           AND RS_PRES.DR_ID = RS.DR_ID
+           AND RS_PRES.RESERV_DATE = RS.RESERV_DATE
+           AND RS_PRES.RESERV_TIME = RS.RESERV_TIME
+           AND COM_FIRST.COMMON_ID = 'F'
+           AND COM_FIRST.COMMON_CD = RS.FIRST_ID
+           AND RS_PRES.PRES_ID = PAY.PRES_ID
+           AND RS_PRES.PRES_ID = UNPAID.PRES_ID
+                 
+         GROUP BY RS_PRES.PAT_ID
+                 ,RS_PRES.DR_ID
+                 ,RS_PRES.RESERV_DATE
+                 ,RS_PRES.RESERV_TIME
+      ) CAL <!-- 급여별 비급여별 합계와 진찰료 테이블 -->
+     <!--↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑CAL테이블 끝↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ -->
+     
+  WHERE 1=1
+    AND RS.PAT_ID = #pat_id#
+    AND RS.RESERV_DATE = #rs_date#
+    AND RS.RESERV_TIME = #rs_time#
+    AND RS.DR_ID = #dr_id#
+   
+    AND RS.DR_ID = DR.DR_ID
+    AND RS.PAT_ID = RS_INS.PAT_ID
+    AND RS.DR_ID = RS_INS.DR_ID
+    AND RS.RESERV_DATE = RS_INS.RESERV_DATE
+    AND RS.RESERV_TIME = RS_INS.RESERV_TIME
+    AND COM1.COMMON_ID = 'R'
+    AND RS.STATE_ID = COM1.COMMON_CD
+    AND COM2.COMMON_ID = 'P'
+    AND RS.REQUEST_ID = COM2.COMMON_CD
+    AND COM3.COMMON_ID = 'F'
+    AND RS.FIRST_ID = COM3.COMMON_CD
+    AND COM4.COMMON_ID = 'C'
+    AND PY.PAY_MTHD_ID = COM4.COMMON_CD
+    AND COM5.COMMON_ID = 'A'
+    AND PY.CASH_MTHD_ID = COM5.COMMON_CD
+    AND RS.PAT_ID = PY.PAT_ID
+    AND RS.DR_ID = PY.DR_ID
+    AND RS.RESERV_DATE = PY.RESERV_DATE
+    AND RS.RESERV_TIME = PY.RESERV_TIME
+    AND RS_INS.INS_ID = INS.INS_ID
+    AND RS_INS.COPAYDEC_ID = COPAY_DEC.COPAYDEC_ID
+    AND RS.PAT_ID = PT.PAT_ID
+    AND DR.DEPT_ID = DP.DEPT_ID
+    AND RS.PAT_ID = CAL.PAT_ID
+    AND RS.DR_ID = CAL.DR_ID
+    AND RS.RESERV_DATE = CAL.RS_DATE
+    AND RS.RESERV_TIME = CAL.RS_TIME
+    
+  ORDER BY DR.DEPT_ID
+          ,RS.DR_ID
+          ,RS.RESERV_DATE
+          ,RS.RESERV_TIME
+
+    </statement>
+    
+</sqls>

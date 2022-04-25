@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+           
+<services module="pm_pm_rsrhmngtmgr" package="phis.nu.his.pm.pm_rsrhmngtmgr" pre-init="false">
+    
+    <service name="IntnMngtMgtDAO"
+             interface="${package}.intnmngtmgt.dao.IntnMngtMgtDAO"
+             class="${package}.intnmngtmgt.dao.IntnMngtMgtDAOImpl"
+             interceptor="system.proxy"
+             singleton="true"> 
+         <property name="datasource" ref="jdbc.pmdb"/>
+         <property name="sql" value="sqls/intnmngt_sqls.xml"/>
+    </service>
+    
+    <service name="IntnMngtMgt"
+             interface="${package}.intnmngtmgt.IntnMngtMgt"
+             class="${package}.intnmngtmgt.IntnMngtMgtImpl"
+             interceptor="system.proxy"
+             singleton="true"> 
+         <property name="dao" ref="IntnMngtMgtDAO"/>
+    </service>
+</services>
